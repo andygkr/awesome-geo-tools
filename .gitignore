@@ -1,0 +1,6 @@
+# Traffic data (collected locally, not shared)
+traffic_data/
+
+# Python
+__pycache__/
+*.pyc

@@ -1,4 +1,4 @@
-# Awesome GEO Tools [![Awesome](https://awesome.re/badge.svg)](https://awesome.re)
+# Awesome GEO Tools [![Awesome](https://awesome.re/badge.svg)](https://awesome.re) [![Hits](https://hits.sh/github.com/vibetags/awesome-geo-tools.svg?style=flat&label=visitors&color=00cc88)](https://hits.sh/github.com/vibetags/awesome-geo-tools/)
 
 > A curated list of tools, resources, and guides for **Generative Engine Optimization (GEO)** — making brands visible in AI search engines like ChatGPT, Gemini, Perplexity, and Claude.
 
