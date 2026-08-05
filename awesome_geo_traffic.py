@@ -50,17 +50,43 @@ REPORT_FILE = DATA_DIR / "TRAFFIC_REPORT.md"
 
 
 def get_headers():
-    """Get GitHub API headers with authentication."""
+    """Get GitHub API headers with authentication.
+    Tries GITHUB_TOKEN env var first, then falls back to `gh auth token`."""
     token = os.environ.get("GITHUB_TOKEN")
     if not token:
-        print("❌ GITHUB_TOKEN not set. Export it first:")
-        print('   export GITHUB_TOKEN="ghp_your_token"')
-        print("   Create one at: https://github.com/settings/tokens")
+        # Try gh CLI fallback
+        import subprocess
+        try:
+            result = subprocess.run(
+                ["gh", "auth", "token"], capture_output=True, text=True, timeout=5
+            )
+            if result.returncode == 0 and result.stdout.strip():
+                token = result.stdout.strip()
+        except (FileNotFoundError, subprocess.TimeoutExpired):
+            pass
+    if not token:
+        print("❌ Kein GitHub Token gefunden.")
+        print("   Option A: export GITHUB_TOKEN='ghp_dein_token'")
+        print("   Option B: gh auth login")
         sys.exit(1)
     return {
         "Authorization": f"token {token}",
         "Accept": "application/vnd.github.v3+json",
     }
+
+
+def safe_api_call(url: str, headers: dict, label: str):
+    """Make an API call that gracefully handles 403 (missing push access)."""
+    try:
+        resp = requests.get(url, headers=headers)
+        if resp.status_code == 403:
+            print(f"    ⚠️  {label}: Kein Zugriff (403) — benötigt push/admin Rechte")
+            return None
+        resp.raise_for_status()
+        return resp.json()
+    except requests.exceptions.RequestException as e:
+        print(f"    ⚠️  {label}: Fehler — {e}")
+        return None
 
 
 def load_json(filepath: Path) -> dict:
@@ -135,78 +161,92 @@ def collect_data():
 
     print(f"📊 Collecting traffic data for {REPO_OWNER}/{REPO_NAME}...")
 
-    # --- Views ---
+    # --- Views (requires push access) ---
     print("  → Fetching page views...")
-    views_api = fetch_views(headers)
+    views_api = safe_api_call(
+        f"https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}/traffic/views",
+        headers, "Views"
+    )
     views_data = load_json(VIEWS_FILE)
 
-    new_days = 0
-    for entry in views_api.get("views", []):
-        date_key = entry["timestamp"][:10]  # "2026-07-20T00:00:00Z" → "2026-07-20"
-        if date_key not in views_data["daily"]:
-            new_days += 1
-        views_data["daily"][date_key] = {
-            "count": entry["count"],
-            "uniques": entry["uniques"],
-        }
+    if views_api:
+        new_days = 0
+        for entry in views_api.get("views", []):
+            date_key = entry["timestamp"][:10]
+            if date_key not in views_data["daily"]:
+                new_days += 1
+            views_data["daily"][date_key] = {
+                "count": entry["count"],
+                "uniques": entry["uniques"],
+            }
+        views_data["meta"]["last_collected"] = now
+        if not views_data["meta"]["first_collected"]:
+            views_data["meta"]["first_collected"] = now
+        views_data["meta"]["total_14d"] = views_api.get("count", 0)
+        views_data["meta"]["uniques_14d"] = views_api.get("uniques", 0)
+        save_json(VIEWS_FILE, views_data)
+        print(f"    ✅ {len(views_data['daily'])} Tage gespeichert ({new_days} neu)")
 
-    views_data["meta"]["last_collected"] = now
-    if not views_data["meta"]["first_collected"]:
-        views_data["meta"]["first_collected"] = now
-    views_data["meta"]["total_14d"] = views_api.get("count", 0)
-    views_data["meta"]["uniques_14d"] = views_api.get("uniques", 0)
-    save_json(VIEWS_FILE, views_data)
-    print(f"    ✅ {len(views_data['daily'])} Tage gespeichert ({new_days} neu)")
-
-    # --- Clones ---
+    # --- Clones (requires push access) ---
     print("  → Fetching clones...")
-    clones_api = fetch_clones(headers)
+    clones_api = safe_api_call(
+        f"https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}/traffic/clones",
+        headers, "Clones"
+    )
     clones_data = load_json(CLONES_FILE)
 
-    for entry in clones_api.get("clones", []):
-        date_key = entry["timestamp"][:10]
-        clones_data["daily"][date_key] = {
-            "count": entry["count"],
-            "uniques": entry["uniques"],
-        }
+    if clones_api:
+        for entry in clones_api.get("clones", []):
+            date_key = entry["timestamp"][:10]
+            clones_data["daily"][date_key] = {
+                "count": entry["count"],
+                "uniques": entry["uniques"],
+            }
+        clones_data["meta"]["last_collected"] = now
+        if not clones_data["meta"]["first_collected"]:
+            clones_data["meta"]["first_collected"] = now
+        clones_data["meta"]["total_14d"] = clones_api.get("count", 0)
+        clones_data["meta"]["uniques_14d"] = clones_api.get("uniques", 0)
+        save_json(CLONES_FILE, clones_data)
+        print(f"    ✅ {len(clones_data['daily'])} Tage gespeichert")
 
-    clones_data["meta"]["last_collected"] = now
-    if not clones_data["meta"]["first_collected"]:
-        clones_data["meta"]["first_collected"] = now
-    clones_data["meta"]["total_14d"] = clones_api.get("count", 0)
-    clones_data["meta"]["uniques_14d"] = clones_api.get("uniques", 0)
-    save_json(CLONES_FILE, clones_data)
-    print(f"    ✅ {len(clones_data['daily'])} Tage gespeichert")
-
-    # --- Referrers ---
+    # --- Referrers (requires push access) ---
     print("  → Fetching referrers...")
-    referrers = fetch_referrers(headers)
+    referrers = safe_api_call(
+        f"https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}/traffic/popular/referrers",
+        headers, "Referrers"
+    )
     ref_data = load_json(REFERRERS_FILE)
 
-    ref_data["daily"][today] = [
-        {"referrer": r["referrer"], "count": r["count"], "uniques": r["uniques"]}
-        for r in referrers
-    ]
-    ref_data["meta"]["last_collected"] = now
-    if not ref_data["meta"]["first_collected"]:
-        ref_data["meta"]["first_collected"] = now
-    save_json(REFERRERS_FILE, ref_data)
-    print(f"    ✅ {len(referrers)} Referrer gefunden")
+    if referrers:
+        ref_data["daily"][today] = [
+            {"referrer": r["referrer"], "count": r["count"], "uniques": r["uniques"]}
+            for r in referrers
+        ]
+        ref_data["meta"]["last_collected"] = now
+        if not ref_data["meta"]["first_collected"]:
+            ref_data["meta"]["first_collected"] = now
+        save_json(REFERRERS_FILE, ref_data)
+        print(f"    ✅ {len(referrers)} Referrer gefunden")
 
-    # --- Popular Paths ---
+    # --- Popular Paths (requires push access) ---
     print("  → Fetching popular paths...")
-    paths = fetch_popular_paths(headers)
+    paths = safe_api_call(
+        f"https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}/traffic/popular/paths",
+        headers, "Popular Paths"
+    )
     paths_data = load_json(POPULAR_FILE)
 
-    paths_data["daily"][today] = [
-        {"path": p["path"], "title": p["title"], "count": p["count"], "uniques": p["uniques"]}
-        for p in paths
-    ]
-    paths_data["meta"]["last_collected"] = now
-    if not paths_data["meta"]["first_collected"]:
-        paths_data["meta"]["first_collected"] = now
-    save_json(POPULAR_FILE, paths_data)
-    print(f"    ✅ {len(paths)} populäre Pfade")
+    if paths:
+        paths_data["daily"][today] = [
+            {"path": p["path"], "title": p["title"], "count": p["count"], "uniques": p["uniques"]}
+            for p in paths
+        ]
+        paths_data["meta"]["last_collected"] = now
+        if not paths_data["meta"]["first_collected"]:
+            paths_data["meta"]["first_collected"] = now
+        save_json(POPULAR_FILE, paths_data)
+        print(f"    ✅ {len(paths)} populäre Pfade")
 
     # --- Repo Stats ---
     print("  → Fetching repo stats...")
