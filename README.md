@@ -93,6 +93,7 @@ Tools that **track** how your brand appears in AI-generated answers.
 | **Promptwatch** | Agentische AISO platform — brand representation analytics in AI answers with automated optimization workflows. €6M Seed (Jul 2026, seed+speed Ventures), 2M€ ARR in 12 months. Amsterdam + NYC. **Content Agent** (Aug 2026): automated GEO/AEO content generation and publishing based on citation data and AI search prompts | ChatGPT, Perplexity, Gemini, Claude | [promptwatch.io](https://promptwatch.io) |
 | **Lantern** | Agentic Commerce Performance platform — tracks Agent Ready Score, AI Visibility, and applies automated fixes on catalog level (July 2026) | ChatGPT, Perplexity, Gemini, Claude | [lantern.is](https://lantern.is) |
 | **Adobe Brand Visibility** | Enterprise GEO platform (post-Semrush acquisition for $1.9B) — unified AI visibility tracking across ~300M real AI search prompts, integrated with Adobe CX Enterprise Suite for agentic content optimization. AI traffic to US retail +1,324%, travel +2,215% (Oct 2024–May 2026). Launched June 17, 2026 | ChatGPT, Google AI Mode, Microsoft Copilot, Perplexity AI | [adobe.com](https://adobe.com) |
+| **GrackerAI** |Cybersecurity-focused GEO platform for AI search visibility, owned, competitors, and third-party citation source tracking, competitor analysis, and content gap identification | ChatGPT, Gemini, Perplexity, Copilot, Grok and more | [gracker.ai](https://gracker.ai) |
 
 ## Structured Data & Schema.org
 
